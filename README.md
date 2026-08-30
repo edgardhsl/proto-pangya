@@ -1,135 +1,135 @@
+<div align="center">
+
 # proto-pangya
 
-A Go library for working with the PangYa network protocol.
+**PangYa protocol toolkit for Go.**
 
-`proto-pangya` aims to provide a small, reusable, and well-tested protocol layer for PangYa servers, packet tools, proxies, and protocol research. It is designed as an independent dependency and intentionally contains no game-server business logic.
+Decode, encode and inspect PangYa network packets without coupling protocol code to a specific server emulator.
 
-> **Status:** early development. The API and supported protocol surface are not stable yet.
+[![Go](https://img.shields.io/badge/Go-library-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Status](https://img.shields.io/badge/status-early%20development-orange)](#project-status)
 
-## What it will provide
+</div>
 
-- TCP stream framing that correctly handles fragmented and coalesced frames
-- PangYa client/server packet encryption and decryption
-- Protocol-compatible compression and decompression
-- Safe binary packet readers and writers
+> [!IMPORTANT]
+> This project is under active protocol research. The public API is not stable yet and should not be considered production-ready.
+
+## About
+
+`proto-pangya` is an independent Go library for the PangYa wire protocol. It is intended to be used as a dependency by server emulators, packet analyzers, proxies, debugging tools and protocol research utilities.
+
+The project focuses exclusively on the protocol layer. Gameplay, persistence, authentication policy, rooms, player state, authorization and anti-cheat decisions belong to the application using the library.
+
+## Features
+
+- TCP stream framing with support for fragmented and coalesced frames
+- Client-to-server and server-to-client packet encryption/decryption
+- Protocol-compatible compression/decompression
+- Bounds-checked binary packet readers and writers
 - Typed packet encoding and decoding
-- Packet routing by service, direction, and client version/season
-- Protocol-level anomaly reporting for malformed or suspicious traffic
-- Configurable structured logging and opt-in packet tracing
-- Golden-vector, fuzz, differential, replay, and real-client compatibility tests
-- Performance-focused hot paths with measurable allocation and latency budgets
-
-## Design
-
-The library sits between the network transport and the application using it:
-
-```text
-TCP stream
-    ↓
-Frame decoder
-    ↓
-Decrypt
-    ↓
-Decompress
-    ↓
-Packet codec
-    ↓
-Application
-```
-
-The reverse path is used for outgoing packets.
-
-`proto-pangya` owns protocol concerns such as framing, binary encoding, cryptographic transformations, compression, packet metadata, and wire-format validation.
-
-The consuming application remains responsible for sessions, authentication policy, players, rooms, gameplay, persistence, authorization, anti-cheat decisions, rate limiting, and other domain rules.
-
-This dependency direction is intentional:
-
-```text
-pangya-server ─────► proto-pangya
-packet-tool   ─────► proto-pangya
-proxy         ─────► proto-pangya
-```
-
-`proto-pangya` must never depend on a specific emulator.
-
-## Safety
-
-All network input is treated as untrusted.
-
-Protocol parsers are expected to use strict bounds checking, size limits, overflow-safe offset calculations, decompression limits, controlled handling of unknown packets, and typed errors instead of panics.
-
-The original PangYa encryption is implemented for protocol compatibility and must not be treated as modern secure transport.
-
-## Observability
-
-Logging is controlled by the consuming application rather than by a hard dependency on a logging framework.
-
-Planned verbosity levels are:
-
-```text
-OFF · ERROR · WARN · INFO · DEBUG · TRACE
-```
-
-Verbose packet tracing and hex dumps are opt-in and separate from normal logging. Sensitive fields must remain redacted regardless of log level.
-
-Protocol anomalies are reported to the caller; enforcement decisions remain outside the library.
-
-## Compatibility strategy
-
-Protocol behavior is validated through multiple independent sources rather than assuming a single implementation is authoritative.
-
-The project uses, when available:
-
-- observed ProjectG client behavior
-- real packet captures
-- PangDox documentation
-- PangCrypt and other public implementations
-- existing PangYa emulators
-- independently generated golden vectors
-
-When references disagree, reproducible wire behavior and real captures take precedence.
-
-## Testing
-
-Protocol compatibility is not considered proven by round-trip tests alone.
-
-The test suite is intended to combine unit tests, golden vectors, property tests, fuzzing, differential tests, TCP-fragmentation tests, captured-session replay, race detection, benchmarks, and integration tests against real supported clients.
-
-A malformed byte sequence must produce either a valid result or a controlled error — never an out-of-bounds access, unbounded allocation, deadlock, infinite loop, or panic.
+- Protocol routing by service, direction and supported client version
+- Detection and reporting of malformed or suspicious protocol traffic
+- Application-controlled structured logging and opt-in packet tracing
+- Compatibility validation through golden vectors, fuzzing, packet captures and real clients
+- Allocation-conscious hot paths backed by benchmarks
 
 ## Installation
 
-The module is not ready for production use yet. Once the first usable API is released:
+The module is still under development. Once the first usable version is released, it will be installable as a regular Go dependency:
 
 ```bash
 go get github.com/edgardhsl/proto-pangya
 ```
 
-## Development roadmap
+## How it fits
 
-Initial development will focus on the protocol foundation before expanding packet coverage:
+```text
+                        ┌──────────────────┐
+TCP stream ───────────► │   proto-pangya   │ ───────────► Application
+                        │                  │
+                        │  frame           │
+                        │  crypto          │
+                        │  compression     │
+                        │  packet codec    │
+                        │  validation      │
+                        └──────────────────┘
+```
 
-1. Binary reader/writer primitives
-2. Client/server framing and TCP stream decoding
-3. Encryption and decryption
-4. Compression and decompression
-5. High-level codec and session protocol context
-6. Packet registry and typed packets
-7. Logging, tracing, and protocol anomaly API
-8. Capture replay and real-client compatibility suites
-9. Progressive Auth, Game, Message, Ranking, and common packet coverage
+Incoming data is framed, validated, decrypted and decompressed before packet decoding. Outgoing packets follow the inverse pipeline.
+
+The dependency always points toward this library:
+
+```text
+pangya-server ──► proto-pangya
+packet-tool   ──► proto-pangya
+proxy         ──► proto-pangya
+```
+
+`proto-pangya` does not depend on a particular emulator.
+
+## Protocol compatibility
+
+PangYa protocol information comes from reverse engineering and community research, so no single source is treated as authoritative.
+
+Compatibility is established by comparing reproducible behavior across sources such as:
+
+- real PangYa client traffic and packet captures;
+- observed ProjectG behavior;
+- [PangDox](https://packets.pangdox.com/);
+- PangCrypt and other public protocol implementations;
+- existing PangYa server emulators;
+- independently generated test vectors.
+
+When references disagree, reproducible wire behavior and real client captures take precedence.
+
+## Reliability and security
+
+Network data is untrusted input. Protocol code is designed around strict bounds checking, explicit size limits, overflow-safe parsing, decompression limits and controlled errors.
+
+Malformed input must never result in an out-of-bounds access, uncontrolled allocation, deadlock or panic.
+
+Protocol anomalies are reported to the consuming application. Decisions such as disconnecting, rate limiting or banning clients remain server responsibilities.
+
+PangYa's original packet encryption is implemented for interoperability and must not be considered modern secure transport.
+
+## Observability
+
+The consuming application controls logging. The library does not require a specific logging framework.
+
+Logging is designed around `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG` and `TRACE` levels, with optional component/session overrides. Raw packet traces and hex dumps are explicitly opt-in, and sensitive fields remain redacted regardless of verbosity.
+
+## Testing
+
+Protocol compatibility requires more than encode/decode round trips. The project is designed to combine:
+
+- unit and property tests;
+- golden protocol vectors;
+- differential tests against independent implementations;
+- fuzz testing of parsers and stream boundaries;
+- replay of captured sessions;
+- arbitrary TCP fragmentation/coalescing tests;
+- Go race detection;
+- allocation and latency benchmarks;
+- integration tests with supported PangYa clients.
+
+## Project status
+
+The project is currently building its protocol foundation. Development is progressing through binary primitives, framing, crypto, compression and the high-level codec before expanding typed packet coverage across PangYa services and client versions.
+
+Until the first tagged release, APIs and package boundaries may change without notice.
 
 ## Contributing
 
-Protocol changes should be evidence-driven. Wire-format changes should include a reproducible fixture, capture, golden vector, or another independently verifiable reference whenever possible.
+Contributions are welcome, especially protocol research backed by reproducible evidence.
 
-Parser changes should include malformed-input coverage. Performance-sensitive changes should include benchmarks.
+Changes to wire behavior should include a packet capture, golden vector, test fixture or another independently verifiable reference whenever possible. Parser changes should include malformed-input coverage, and performance-sensitive changes should include benchmarks.
+
+For larger changes, open an issue before implementation so the protocol behavior and API design can be discussed first.
 
 ## License
 
-No open-source license has been selected yet. Until a license file is added, standard copyright rules apply.
+A license has not been selected yet. Until a `LICENSE` file is added, the repository is **source available but not open source** and standard copyright rules apply.
 
 ## Disclaimer
 
-This is an independent interoperability and protocol-research project. PangYa and related names and assets belong to their respective owners. This project is not affiliated with or endorsed by the original developers or publishers of PangYa.
+This is an independent interoperability and protocol-research project. PangYa and related names and assets are property of their respective owners. This project is not affiliated with or endorsed by the original developers or publishers of PangYa.
